@@ -566,4 +566,66 @@ ORDER BY MIN(o.order_date);
 ```
 
 ---
+  ## 36. Find Top 3 Best-Selling Products in Each Category
+
+Objective: Identify the highest-performing products within each product category based on revenue generated.
+```sql
+WITH total_sales_p AS (
+    SELECT
+        p.product_name,
+        c.category_name,
+        SUM(oi.total_price) AS total_sales
+    FROM product p
+    JOIN category c
+        ON p.category_id = c.category_id
+    JOIN order_items oi
+        ON p.product_id = oi.product_id
+    GROUP BY 1,2
+),
+top_3 AS (
+    SELECT *,
+           DENSE_RANK() OVER (
+               PARTITION BY category_name
+               ORDER BY total_sales DESC
+           ) AS rk
+    FROM total_sales_p
+)
+SELECT *
+FROM top_3
+WHERE rk <= 3;
+```
+## 37. Find Complete Order Details (Customer, Product, Seller, Payment & Shipping Information)
+
+### Objective
+Generate a comprehensive order report by combining customer, product, category, seller, payment, shipping, and order information into a single view.
+
+### SQL Query
+
+```sql
+SELECT
+    CONCAT(c.first_name, ' ', c.last_name) AS customer_name,
+    p.product_name,
+    ct.category_name,
+    py.payment_mode,
+    py.payment_status,
+    s.shipping_date,
+    o.order_date,
+    sp.seller_name
+FROM order_items oi
+JOIN customers c
+    ON c.customer_id = oi.customer_id
+JOIN product p
+    ON oi.product_id = p.product_id
+JOIN category ct
+    ON oi.category_id = ct.category_id
+JOIN payments py
+    ON oi.order_id = py.order_id
+JOIN shipping s
+    ON oi.order_id = s.order_id
+JOIN orders o
+    ON o.order_id = oi.order_id
+JOIN seller sp
+    ON o.seller_id = sp.seller_id;
+```
+
 
