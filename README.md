@@ -627,5 +627,280 @@ JOIN orders o
 JOIN seller sp
     ON o.seller_id = sp.seller_id;
 ```
+## Advanced SQL Business Analysis Questions
 
+### 38. Find Second Highest Revenue-Generating Seller
+Identifies the seller with the second-highest total revenue.
+
+```sql
+WITH seller_name AS (
+    SELECT
+        s.seller_id,
+        s.seller_name,
+        SUM(oi.total_price) AS total_sales
+    FROM orders o
+    JOIN seller s
+        ON o.seller_id = s.seller_id
+    JOIN order_items oi
+        ON oi.order_id = o.order_id
+    GROUP BY s.seller_id, s.seller_name
+),
+seller_rank AS (
+    SELECT *,
+           DENSE_RANK() OVER (ORDER BY total_sales DESC) AS ranking
+    FROM seller_name
+)
+SELECT *
+FROM seller_rank
+WHERE ranking = 2;
+```
+
+### 39. Find Second Highest Spending Customer
+Finds customers ranked second based on total spending.
+
+```sql
+WITH customer_name AS (
+    SELECT
+        c.customer_id,
+        CONCAT(c.first_name,' ',c.last_name) AS customer_name,
+        SUM(oi.total_price) AS total_sales
+    FROM customers c
+    JOIN order_items oi
+        ON c.customer_id = oi.customer_id
+    GROUP BY 1,2
+),
+ranking AS (
+    SELECT *,
+           DENSE_RANK() OVER (ORDER BY total_sales DESC) AS ranking
+    FROM customer_name
+)
+SELECT *
+FROM ranking
+WHERE ranking = 2;
+```
+
+### 40. Find Top 3 Products Within Each Category
+Ranks products within each category and returns the top 3.
+
+```sql
+WITH total_sales_p AS (
+    SELECT
+        p.product_name,
+        c.category_name,
+        SUM(oi.total_price) AS total_sales
+    FROM product p
+    JOIN category c
+        ON p.category_id = c.category_id
+    JOIN order_items oi
+        ON p.product_id = oi.product_id
+    GROUP BY 2,1
+),
+top_3 AS (
+    SELECT *,
+           DENSE_RANK() OVER (
+               PARTITION BY category_name
+               ORDER BY total_sales DESC
+           ) AS rk
+    FROM total_sales_p
+)
+SELECT *
+FROM top_3
+WHERE rk <= 3;
+```
+
+### 41. Find Products Contributing More Than 5% of Total Revenue
+Calculates revenue contribution percentage of each product.
+
+```sql
+WITH total_product_sales AS (
+    SELECT
+        p.product_name,
+        SUM(oi.total_price) AS product_total_sales
+    FROM product p
+    JOIN order_items oi
+        ON p.product_id = oi.product_id
+    GROUP BY p.product_name
+)
+SELECT *
+FROM (
+    SELECT
+        product_name,
+        product_total_sales,
+        ROUND(
+            product_total_sales * 100.0 /
+            SUM(product_total_sales) OVER (),
+            2
+        ) AS revenue_percentage
+    FROM total_product_sales
+) t
+WHERE revenue_percentage > 5;
+```
+
+### 42. Find Customers Whose Spending Is Above Average
+Returns customers whose total spending exceeds average customer spending.
+
+```sql
+WITH customers_total AS (
+    SELECT
+        c.customer_id,
+        CONCAT(c.first_name,' ',c.last_name) AS customer_name,
+        SUM(oi.total_price) AS total_spending
+    FROM orders o
+    JOIN order_items oi
+        ON o.order_id = oi.order_id
+    JOIN customers c
+        ON o.customer_id = c.customer_id
+    GROUP BY customer_name, c.customer_id
+),
+average_spending AS (
+    SELECT AVG(total_spending) AS average_spending
+    FROM customers_total
+)
+SELECT ct.*
+FROM customers_total ct
+JOIN average_spending a
+    ON ct.total_spending > a.average_spending;
+```
+
+### 43. Find Sellers Whose Revenue Is Above Average
+Returns sellers generating above-average revenue.
+
+```sql
+WITH ct AS (
+    SELECT
+        s.seller_id,
+        s.seller_name,
+        SUM(oi.total_price) AS total_revenue
+    FROM seller s
+    JOIN orders o
+        ON s.seller_id = o.seller_id
+    JOIN order_items oi
+        ON o.order_id = oi.order_id
+    GROUP BY s.seller_id, s.seller_name
+),
+avg_total AS (
+    SELECT AVG(total_revenue) AS average_total
+    FROM ct
+)
+SELECT t.*
+FROM ct t
+JOIN avg_total a
+    ON t.total_revenue > a.average_total;
+```
+
+### 44. Find the Highest Revenue Product in Each Category
+Identifies the top revenue-generating product within every category.
+
+```sql
+WITH total_sales_p AS (
+    SELECT
+        p.product_name,
+        c.category_name,
+        SUM(oi.total_price) AS total_sales
+    FROM product p
+    JOIN category c
+        ON p.category_id = c.category_id
+    JOIN order_items oi
+        ON p.product_id = oi.product_id
+    GROUP BY 2,1
+),
+top_product AS (
+    SELECT *,
+           DENSE_RANK() OVER (
+               PARTITION BY category_name
+               ORDER BY total_sales DESC
+           ) AS rk
+    FROM total_sales_p
+)
+SELECT *
+FROM top_product
+WHERE rk = 1;
+```
+
+### 45. Find Repeat Customers
+Finds customers who have placed more than one order.
+
+```sql
+SELECT
+    c.customer_id,
+    COUNT(o.order_id) AS total_orders
+FROM customers c
+JOIN orders o
+    ON c.customer_id = o.customer_id
+GROUP BY c.customer_id
+HAVING COUNT(o.order_id) > 1;
+```
+
+### 46. Find Average Products Purchased Per Order
+Calculates the average quantity of products purchased per order.
+
+```sql
+SELECT
+    ROUND(AVG(total_quantity), 2) AS avg_products_per_order
+FROM (
+    SELECT
+        order_id,
+        SUM(quantity) AS total_quantity
+    FROM order_items
+    GROUP BY order_id
+) t;
+```
+
+### 47. Find Order Status-wise Revenue
+Analyzes revenue generated across different order statuses.
+
+```sql
+SELECT
+    o.order_status,
+    SUM(oi.total_price) AS total_sales
+FROM orders o
+JOIN order_items oi
+    ON o.order_id = oi.order_id
+GROUP BY o.order_status
+ORDER BY total_sales DESC;
+```
+
+### 48. Find Payment Status-wise Revenue
+Calculates revenue grouped by payment status.
+
+```sql
+SELECT
+    p.payment_status,
+    SUM(oi.total_price) AS total_sales
+FROM payments p
+JOIN order_items oi
+    ON p.order_id = oi.order_id
+GROUP BY p.payment_status
+ORDER BY total_sales DESC;
+```
+
+### 49. Find Delivery Status-wise Revenue
+Analyzes revenue by delivery status.
+
+```sql
+SELECT
+    s.delivery_status,
+    SUM(oi.total_price) AS total_sales
+FROM shipping s
+JOIN order_items oi
+    ON s.order_id = oi.order_id
+GROUP BY s.delivery_status
+ORDER BY total_sales DESC;
+```
+
+### 50. Calculate Customer Lifetime Value (CLV)
+Calculates the total revenue generated by each customer throughout their relationship with the business.
+
+```sql
+SELECT
+    c.customer_id,
+    CONCAT(c.first_name,' ',c.last_name) AS customer_name,
+    SUM(oi.total_price) AS lifetime_value
+FROM orders o
+JOIN order_items oi
+    ON o.order_id = oi.order_id
+JOIN customers c
+    ON o.customer_id = c.customer_id
+GROUP BY customer_name, c.customer_id;
+```
 
