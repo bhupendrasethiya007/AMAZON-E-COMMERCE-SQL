@@ -1123,4 +1123,47 @@ WITH yearly_sales AS(
           AS YOY
           FROM pre_sales
 ```
+### 61. Calculate Sales in the Last 30 Days
 
+Analyzes revenue generated during the most recent 30-day period.
+
+```sql
+WITH max_date AS (
+    SELECT MAX(order_date) AS latest_date
+    FROM orders
+)
+SELECT
+    SUM(oi.total_price) AS last_30_days_sales
+FROM orders o
+JOIN order_items oi
+    ON o.order_id = oi.order_id
+CROSS JOIN max_date m
+WHERE o.order_date >= m.latest_date - INTERVAL '30 days';
+```
+### 62. Calculate 30-Day Rolling Average Sales
+
+Calculates a 30-day moving average of daily sales to identify long-term revenue trends.
+
+```sql
+WITH daily_sales AS (
+    SELECT
+        o.order_date,
+        SUM(oi.total_price) AS daily_sales
+    FROM orders o
+    JOIN order_items oi
+        ON o.order_id = oi.order_id
+    GROUP BY o.order_date
+)
+SELECT
+    order_date,
+    daily_sales,
+    ROUND(
+        AVG(daily_sales) OVER (
+            ORDER BY order_date
+            ROWS BETWEEN 29 PRECEDING AND CURRENT ROW
+        ),
+        2
+    ) AS rolling_30_day_avg
+FROM daily_sales
+ORDER BY order_date;
+```
