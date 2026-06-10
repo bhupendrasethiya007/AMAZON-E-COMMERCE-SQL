@@ -903,4 +903,224 @@ JOIN customers c
     ON o.customer_id = c.customer_id
 GROUP BY customer_name, c.customer_id;
 ```
+## Window Function Questions
+
+### 51. Rank Customers Based on Spending
+
+```sql
+WITH customer_name AS(
+         SELECT c.customer_id,CONCAT(c.first_name,' ',c.last_name) as customer_name,
+                 SUM(oi.total_price) as total_sales
+                 FROM customers c
+                 JOIN
+                 order_items oi
+                 ON c.customer_id=oi.customer_id
+                 GROUP BY 1,2
+         ),ranking AS(
+                    SELECT *,DENSE_RANK() 
+                    OVER(ORDER BY total_sales DESC) AS ranking
+                    FROM customer_name
+         ) 
+               SELECT * FROM ranking
+```
+
+### 52. Rank Sellers Based on Revenue
+
+```sql
+WITH seller_name AS(
+          SELECT s.seller_id, s.seller_name,SUM(oi.total_price) AS total_sales
+          FROM orders o
+          JOIN
+          seller s
+          ON o.seller_id=s.seller_id
+          JOIN
+          order_items oi
+          ON oi.order_id=o.order_id
+          GROUP BY  s.seller_id,s.seller_name
+        ),seller_rank AS(
+          SELECT *, DENSE_RANK() OVER(ORDER BY total_sales DESC) AS ranking
+          FROM seller_name
+        )
+        SELECT * FROM seller_rank
+```
+
+### 53. Rank Products Based on Quantity Sold
+
+```sql
+WITH total_sold AS(
+        SELECT p.product_name ,SUM(oi.quantity) AS total_sold
+        FROM 
+        product p
+        JOIN
+        order_items oi
+        ON p.product_id=oi.product_id
+        GROUP BY p.product_name)
+        SELECT product_name , total_sold,
+        dense_rank() OVER(order by total_sold DESC) AS rnk
+        FROM total_sold
+```
+
+### 54. Calculate Cumulative Revenue Over Time
+
+```sql
+SELECT o.order_date,oi.total_price,SUM(oi.total_price) 
+OVER( ORDER BY o. order_date rows between unbounded preceding and current row) 
+as running_sum         
+FROM order_items oi
+JOIN
+orders o
+ON oi.order_id=o.order_id
+```
+
+### 55. Calculate Running Total of Orders
+
+```sql
+WITH daily_orders AS (
+    SELECT
+        order_date,
+        COUNT(order_id) AS total_orders
+    FROM orders
+    GROUP BY order_date
+)
+SELECT
+    order_date,
+    total_orders,
+    SUM(total_orders) OVER (
+        ORDER BY order_date
+    ) AS running_total_orders
+FROM daily_orders
+ORDER BY order_date;
+```
+
+### 56. Compare Current Month's Sales with Previous Month Using LAG()
+
+```sql
+WITH monthly_sales AS(
+          SELECT 
+          TO_CHAR(o.order_date,'Month') AS months,
+          EXTRACT(month from o.order_date) as month_num,
+          SUM(oi.total_price) AS total_sales 
+          FROM order_items oi
+          JOIN
+          orders o
+          ON oi.order_id=o.order_id
+          GROUP BY months ,month_num
+          )
+          SELECT months,month_num,total_sales,
+          LAG(total_sales) OVER(ORDER BY month_num)
+          AS previous_month_sales
+          FROM monthly_sales
+```
+
+### 57. Find Month-over-Month Revenue Growth
+
+```sql
+WITH monthly_sales AS(
+          SELECT 
+          EXTRACT(year from o.order_date) as years,
+          TO_CHAR(o.order_date,'Month') AS months,
+          EXTRACT(month from o.order_date) as month_num,
+          SUM(oi.total_price) AS total_sales 
+          FROM order_items oi
+          JOIN
+          orders o
+          ON oi.order_id=o.order_id
+          GROUP BY years,month_num,months
+          ), 
+          pre_sales AS(
+          SELECT years, months,month_num,total_sales,
+          LAG(total_sales) 
+          OVER(ORDER BY years,month_num)
+          AS  
+          previous_month_sales
+          FROM monthly_sales
+          )
+          SELECT years,months,month_num,
+          total_sales,previous_month_sales,
+          ROUND(((total_sales - previous_month_sales)/
+          NULLIF(previous_month_sales,0)) 
+          * 100.0
+          ,2) 
+          AS MOM
+          FROM pre_sales
+```
+
+### 58. Find Each Customer's First Order Date
+
+```sql
+WITH first_order AS (
+         SELECT
+        c.customer_id,
+        o.order_id,
+        o.order_date,
+        ROW_NUMBER() OVER (
+            PARTITION BY c.customer_id
+            ORDER BY o.order_date 
+        ) AS rn
+        FROM customers c
+         JOIN orders o
+        ON c.customer_id = o.customer_id
+)
+SELECT
+    customer_id,
+    order_id,
+    order_date AS first_order_date
+FROM first_order
+WHERE rn = 1;
+```
+
+### 59. Find Each Customer's Latest Order Date
+
+```sql
+WITH first_order AS (
+         SELECT
+        c.customer_id,
+        o.order_id,
+        o.order_date,
+        ROW_NUMBER() OVER (
+            PARTITION BY c.customer_id
+            ORDER BY o.order_date DESC
+        ) AS rn
+        FROM customers c
+         JOIN orders o
+        ON c.customer_id = o.customer_id
+)
+SELECT
+    customer_id,
+    order_id,
+    order_date AS first_order_date
+FROM first_order
+WHERE rn = 1;
+```
+
+### 60. Year-over-Year Growth by Total Sales
+
+```sql
+WITH yearly_sales AS(
+          SELECT 
+          EXTRACT(year from o.order_date) as years,
+          SUM(oi.total_price) AS total_sales 
+          FROM order_items oi
+          JOIN
+          orders o
+          ON oi.order_id=o.order_id
+          GROUP BY years
+          ), 
+          pre_sales AS(
+          SELECT years,total_sales,
+          LAG(total_sales) 
+          OVER(ORDER BY years)
+          AS  
+          previous_year_sales
+          FROM yearly_sales
+          )
+          SELECT years,
+          total_sales,previous_year_sales,
+          ROUND(((total_sales - previous_year_sales)/
+          NULLIF(previous_year_sales,0)) 
+          * 100.0
+          ,2) 
+          AS YOY
+          FROM pre_sales
+```
 
