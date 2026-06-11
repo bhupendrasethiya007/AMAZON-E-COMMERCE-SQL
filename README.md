@@ -1318,3 +1318,17 @@ SELECT
 FROM returned_products
 ORDER BY return_percentage DESC;
 ```
+### 69. Identify Orders Where Shipping Took More Than 7 Days
+
+```sql
+SELECT c.customer_id,
+       o.order_id,
+       o.order_date,
+       s.shipping_date
+FROM orders o
+JOIN shipping s
+ON o.order_id = s.order_id
+JOIN customers c
+ON c.customer_id = o.customer_id
+WHERE s.shipping_date - o.order_date > 7;
+```
