@@ -1332,3 +1332,57 @@ JOIN customers c
 ON c.customer_id = o.customer_id
 WHERE s.shipping_date - o.order_date > 7;
 ```
+### 70. Executive Summary Dashboard Query
+
+```sql
+WITH base AS (
+    SELECT 
+        o.order_id,
+        o.customer_id,
+        c.state,
+        oi.total_price,
+        oi.quantity,
+        ca.category_name
+    FROM orders o
+    JOIN order_items oi ON o.order_id = oi.order_id
+    JOIN customers c ON o.customer_id = c.customer_id
+    JOIN product p ON oi.product_id = p.product_id
+    JOIN category ca ON p.category_id = ca.category_id
+    WHERE EXTRACT(YEAR FROM o.order_date) = 2024
+),
+agg AS (
+    SELECT 
+        SUM(total_price) AS total_revenue,
+        COUNT(DISTINCT order_id) AS total_orders,
+        COUNT(DISTINCT customer_id) AS customer_count,
+        ROUND(
+            SUM(total_price) / COUNT(DISTINCT order_id),
+            2
+        ) AS avg_order_value
+    FROM base
+),
+top_category AS (
+    SELECT category_name
+    FROM base
+    GROUP BY category_name
+    ORDER BY SUM(total_price) DESC
+    LIMIT 1
+),
+top_state AS (
+    SELECT state
+    FROM base
+    GROUP BY state
+    ORDER BY SUM(total_price) DESC
+    LIMIT 1
+)
+SELECT 
+    a.total_revenue,
+    a.total_orders,
+    a.customer_count,
+    a.avg_order_value,
+    tc.category_name AS top_selling_category,
+    ts.state AS top_performing_state
+FROM agg a
+CROSS JOIN top_category tc
+CROSS JOIN top_state ts;
+```
