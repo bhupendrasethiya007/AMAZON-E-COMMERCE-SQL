@@ -1279,4 +1279,17 @@ SELECT
 FROM ranked
 ORDER BY total_spent DESC;
 ```
+### 67. Analyze Revenue by Day of Week in 2024
+
+```sql
+SELECT EXTRACT(year from o.order_date) AS year_,
+       TO_CHAR(o.order_date ,'Day') AS days,
+       SUM(oi.total_price) AS total_sales
+FROM orders o
+JOIN order_items oi
+ON o.order_id=oi.order_id
+WHERE EXTRACT(year from o.order_date) = 2024
+GROUP BY year_, days
+ORDER BY total_sales DESC;
+```
 
