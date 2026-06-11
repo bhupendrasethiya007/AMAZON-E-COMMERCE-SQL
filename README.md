@@ -1244,3 +1244,39 @@ SELECT *,
        ) AS roling_avg_7_days
 FROM daily_sales;
 ```
+### 66. Customer Segmentation Using Spending Percentiles
+
+Classifies customers into Platinum, Gold, Silver, and Other tiers based on their total spending percentile using the NTILE() window function.
+
+```sql
+WITH customers_sales AS(
+    SELECT c.customer_id,
+           CONCAT(c.first_name,' ',c.last_name) AS full_name,
+           SUM(oi.total_price) AS total_spent
+    FROM customers c
+    JOIN order_items oi
+        ON c.customer_id=oi.customer_id
+    GROUP BY c.customer_id,full_name
+),
+ranked AS(
+    SELECT customer_id,
+           full_name,
+           total_spent,
+           NTILE(100) OVER(ORDER BY total_spent DESC) AS percentile
+    FROM customers_sales
+)
+SELECT
+    customer_id,
+    full_name,
+    total_spent,
+    percentile,
+    CASE
+        WHEN percentile <= 5 THEN 'Platinum'
+        WHEN percentile <= 20 THEN 'Gold'
+        WHEN percentile <= 50 THEN 'Silver'
+        ELSE 'Others'
+    END AS customer_tier
+FROM ranked
+ORDER BY total_spent DESC;
+```
+
