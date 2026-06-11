@@ -1193,3 +1193,54 @@ SELECT
     ) AS percentage_wise
 FROM total_sales_by_cate;
 ```
+### 64. Identify Products Contributing to 80% of Revenue (Pareto Analysis)
+
+Analyzes product revenue contribution using cumulative sales to identify the products responsible for generating 80% of total revenue. This follows the Pareto Principle (80/20 Rule), which helps businesses focus on high-performing products.
+
+```sql
+WITH product_sales AS(
+    SELECT p.product_name,
+           SUM(oi.total_price) AS product_sales
+    FROM order_items oi
+    JOIN product p
+    ON oi.product_id = p.product_id
+    GROUP BY p.product_name
+),
+run_percentage AS(
+    SELECT product_name,
+           product_sales,
+           SUM(product_sales) OVER(
+               ORDER BY product_sales DESC
+               ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+           ) AS running_total,
+           0.8 * SUM(product_sales) OVER() AS overall_sales
+    FROM product_sales
+)
+SELECT *
+FROM run_percentage
+WHERE running_total <= overall_sales;
+```
+
+### 65. Calculate 7-Day Rolling Average Sales
+
+Calculates a 7-day moving average of daily sales to smooth short-term fluctuations and identify sales trends.
+
+```sql
+WITH daily_sales AS(
+     SELECT o.order_date,
+            SUM(oi.total_price) AS total_sale
+     FROM orders o
+     JOIN order_items oi
+     ON o.order_id=oi.order_id
+     GROUP BY o.order_date
+)
+SELECT *,
+       ROUND(
+           AVG(total_sale) OVER(
+               ORDER BY order_date
+               ROWS BETWEEN 6 PRECEDING AND CURRENT ROW
+           ),
+           2
+       ) AS roling_avg_7_days
+FROM daily_sales;
+```
