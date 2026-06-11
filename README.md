@@ -1167,3 +1167,29 @@ SELECT
 FROM daily_sales
 ORDER BY order_date;
 ```
+### 63. Calculate Category-wise Revenue Contribution Percentage
+
+Calculates the percentage contribution of each product category to total revenue.
+
+```sql
+WITH total_sales_by_cate AS(
+    SELECT
+        c.category_name,
+        SUM(oi.total_price) AS total_sales
+    FROM category c
+    JOIN product p
+        ON p.category_id = c.category_id
+    JOIN order_items oi
+        ON p.product_id = oi.product_id
+    GROUP BY c.category_name
+)
+SELECT
+    category_name,
+    total_sales,
+    ROUND(
+        (total_sales * 100.0) /
+        SUM(total_sales) OVER(),
+        2
+    ) AS percentage_wise
+FROM total_sales_by_cate;
+```
