@@ -1292,4 +1292,29 @@ WHERE EXTRACT(year from o.order_date) = 2024
 GROUP BY year_, days
 ORDER BY total_sales DESC;
 ```
+### 68. Identify Products Returned and Show Return Percentage
 
+```sql
+WITH returned_products AS (
+    SELECT
+        p.product_name,
+        COUNT(*) AS total_returns
+    FROM product p
+    JOIN order_items oi
+        ON p.product_id = oi.product_id
+    JOIN shipping s
+        ON oi.order_id = s.order_id
+    WHERE s.delivery_status = 'Returned'
+    GROUP BY p.product_name
+)
+SELECT
+    product_name,
+    total_returns,
+    ROUND(
+        total_returns * 100.0 /
+        SUM(total_returns) OVER(),
+        2
+    ) AS return_percentage
+FROM returned_products
+ORDER BY return_percentage DESC;
+```
